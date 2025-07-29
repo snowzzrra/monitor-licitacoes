@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados para "{{ numero_busca }}"</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">Monitor de Licitações - Comprasnet BA</span>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <a href="/" class="btn btn-secondary mb-4">&larr; Voltar para Nova Consulta</a>
+
+        <h2>Múltiplos resultados encontrados para a busca: <span class="text-primary">{{ numero_busca }}</span></h2>
+        <p class="text-muted">Por favor, selecione a licitação que deseja visualizar.</p>
+        <hr>
+
+        <div class="list-group">
+            {% for licitacao in licitacoes %}
+            <a href="{{ url_for('detalhes', busca=numero_busca, index=loop.index0) }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1 text-primary">{{ licitacao.numero }}</h5>
+                    <small>{{ licitacao.orgao }}</small>
+                </div>
+                <p class="mb-1">{{ licitacao.objeto }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
