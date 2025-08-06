@@ -1,0 +1,24 @@
+{
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.9"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/verificar-licitacoes",
+      "schedule": "30 11 * * 1-5"
+    }
+  ]
+}
