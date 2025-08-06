@@ -15,7 +15,7 @@ from selenium.common.exceptions import TimeoutException
 
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ---
+# --- CONFIGURAÇÃO DE AMBIENTE ROBUSTA ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
@@ -27,10 +27,10 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Adiciona configurações de pooling para manter a conexão com o DB ativa
+# --- SOLUÇÃO PARA O ERRO DE CONEXÃO SSL ---
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_recycle': 280,  # Recicla conexões a cada 280 segundos (menos de 5 minutos)
-    'pool_pre_ping': True # Verifica se a conexão está viva antes de usá-la
+    'pool_recycle': 280,
+    'pool_pre_ping': True
 }
 
 db = SQLAlchemy(app)
@@ -39,6 +39,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
+# ... (Modelos e funções de notificação permanecem os mesmos) ...
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
@@ -68,7 +69,12 @@ def notificar_todos_usuarios(mensagem):
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
 def configurar_driver_selenium():
+    """
+    Configura as opções do Chrome para o ambiente da Vercel,
+    deixando o Selenium Manager gerenciar o chromedriver.
+    """
     options = webdriver.ChromeOptions()
+    # O Selenium Manager precisa do binário do Chrome para saber qual driver baixar.
     options.binary_location = '/opt/google/chrome/chrome'
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
@@ -79,8 +85,10 @@ def configurar_driver_selenium():
     options.add_argument("--disable-dev-tools")
     options.add_argument("--no-zygote")
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
-    service = webdriver.ChromeService("/opt/chromedriver/chromedriver")
-    driver = webdriver.Chrome(service=service, options=options)
+    
+    # --- MUDANÇA PRINCIPAL ---
+    # Não especificamos mais o 'service'. O Selenium vai encontrar o chromedriver sozinho.
+    driver = webdriver.Chrome(options=options)
     return driver
 
 def buscar_licitacoes_por_data(data_busca):
