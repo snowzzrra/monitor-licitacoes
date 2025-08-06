@@ -68,6 +68,10 @@ def notificar_todos_usuarios(mensagem):
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
 def configurar_driver_selenium():
+    """
+    Configura as opções do Chrome para o ambiente da Vercel,
+    apontando para o chromedriver instalado manualmente.
+    """
     options = webdriver.ChromeOptions()
     options.binary_location = '/opt/google/chrome/chrome'
     options.add_argument('--headless=new')
@@ -80,12 +84,13 @@ def configurar_driver_selenium():
     options.add_argument("--no-zygote")
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
     
-    # --- MUDANÇA PRINCIPAL ---
-    # Não precisamos mais do 'service'. O Selenium encontrará o chromedriver no PATH.
-    driver = webdriver.Chrome(options=options)
+    # --- A CORREÇÃO FINAL ---
+    # Apontamos explicitamente para o chromedriver que instalamos no build.sh
+    service = webdriver.ChromeService("/usr/local/bin/chromedriver")
+    
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
 
-# ... (O restante do código, incluindo as funções de scraping e rotas, permanece o mesmo) ...
 def buscar_licitacoes_por_data(data_busca):
     driver = None
     try:
