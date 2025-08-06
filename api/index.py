@@ -71,7 +71,7 @@ def configurar_driver_selenium():
     options.add_argument("--no-zygote")
     
     # A MÁGICA COM O NOVO PACOTE SUGERIDO POR VOCÊ
-    driver_path = cft_manager.ChromeManager().get_driver_path()
+    driver_path = cft_manager.Manager().get_driver_path()
     service = Service(executable_path=driver_path)
     
     driver = webdriver.Chrome(service=service, options=options)
