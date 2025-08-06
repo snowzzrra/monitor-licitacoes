@@ -1,10 +1,21 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor de Licitações - Comprasnet BA</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .tab-content {
+            border: 1px solid #dee2e6;
+            border-top: 0;
+            padding: 1.5rem;
+            border-radius: 0 0 .375rem .375rem;
+        }
+        .debug-buttons .btn {
+            margin-left: 0.5rem;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-dark bg-primary mb-4">
@@ -13,63 +24,105 @@
         </div>
     </nav>
 
-    <div class="container" style="max-width: 800px;">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h4 class="mb-0">Consultar Licitação</h4>
-            </div>
-            <div class="card-body">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+    <div class="container" style="max-width: 900px;">
 
-                <form action="{{ url_for('consultar') }}" method="post">
-                    <div class="mb-3">
-                        <label for="numero_licitacao" class="form-label"><b>Número da Licitação e Ano</b></label>
-                        <input type="text" class="form-control" id="numero_licitacao" name="numero_licitacao"
-                               placeholder="Digite o número e o ano"
-                               maxlength="8" 
-                               value="{{ numero_pesquisado or '' }}"
-                               required>
-                        <div class="form-text">
-                            Digite apenas os <strong>7 dígitos</strong> (3 do número + 4 do ano). A barra será inserida automaticamente.
-                        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dia-tab" data-bs-toggle="tab" data-bs-target="#dia-tab-pane" type="button" role="tab">Licitações do Dia</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="notificacoes-tab" data-bs-toggle="tab" data-bs-target="#notificacoes-tab-pane" type="button" role="tab">Notificações</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            
+            <div class="tab-pane fade show active" id="dia-tab-pane" role="tabpanel" tabindex="0">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                    <h4 class="mb-2 mb-md-0">Licitações Monitoradas Hoje ({{ licitacoes_hoje|length }})</h4>
+                    <div class="debug-buttons">
+                        <a href="{{ url_for('forcar_busca') }}" class="btn btn-sm btn-outline-info" title="Busca novas licitações no site do Comprasnet">Forçar Verificação</a>
+                        <a href="{{ url_for('testar_notificacoes') }}" class="btn btn-sm btn-outline-success" title="Envia as licitações da lista abaixo para o Telegram">Testar Notificação</a>
+                        <a href="{{ url_for('limpar_db') }}" class="btn btn-sm btn-outline-danger" title="Apaga as licitações da lista abaixo para novos testes">Limpar Lista</a>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">Consultar</button>
+                </div>
+
+                <p class="text-muted">Clique no número da licitação para ver todos os detalhes e o histórico de eventos.</p>
+                {% if licitacoes_hoje %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Número</th>
+                                <th scope="col">Órgão</th>
+                                <th scope="col">Objeto</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for licitacao in licitacoes_hoje %}
+                            <tr>
+                                <!-- LINK PARA A NOVA ROTA DE DETALHES -->
+                                <td>
+                                    <a href="{{ url_for('detalhes', numero_completo=licitacao.numero_completo) }}" class="fw-bold">
+                                        {{ licitacao.numero_completo }}
+                                    </a>
+                                </td>
+                                <td>{{ licitacao.orgao }}</td>
+                                <td>{{ licitacao.objeto }}</td>
+                                <td><span class="badge bg-secondary">{{ licitacao.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    Nenhuma licitação foi encontrada ou atualizada hoje até o momento.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="tab-pane fade" id="notificacoes-tab-pane" role="tabpanel" tabindex="0">
+                <h4 class="mb-3">Inscreva-se para Receber Notificações</h4>
+                <p>Receba alertas em tempo real sobre novas licitações e atualizações de status diretamente no seu Telegram.</p>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5>Como se inscrever:</h5>
+                        <ol>
+                            <li class="mb-2">
+                                <strong>Primeiro, inicie uma conversa com o bot no Telegram.</strong> <br>
+                                <small class="text-muted">O bot não pode enviar a primeira mensagem. Procure pelo username do seu bot e clique em "Começar" ou envie um "/start".</small>
+                            </li>
+                            <li>No Telegram, procure pelo bot <strong>@userinfobot</strong> e inicie uma conversa.</li>
+                            <li>O bot responderá com várias informações. Copie o número ao lado de "<strong>Id:</strong>". Este é o seu Chat ID.</li>
+                            <li>Cole o seu Chat ID no campo abaixo e clique em "Inscrever".</li>
+                        </ol>
+                        <hr>
+                        <form action="{{ url_for('inscrever') }}" method="post">
+                            <div class="mb-3">
+                                <label for="chat_id" class="form-label"><strong>Seu Telegram Chat ID</strong></label>
+                                <input type="text" class="form-control" name="chat_id" id="chat_id" placeholder="Ex: 123456789" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Inscrever</button>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Script para formatar o input em tempo real
-        const inputLicitacao = document.getElementById('numero_licitacao');
-
-        inputLicitacao.addEventListener('input', () => {
-            // 1. Remove tudo que não for dígito
-            let value = inputLicitacao.value.replace(/\D/g, '');
-
-            // 2. Limita a 7 dígitos (3 para número, 4 para ano)
-            value = value.substring(0, 7);
-
-            // 3. Adiciona a barra "/" depois do terceiro dígito
-            if (value.length > 3) {
-                value = value.substring(0, 3) + '/' + value.substring(3);
-            }
-
-            // 4. Atualiza o valor do campo
-            inputLicitacao.value = value;
-        });
-    </script>
 </body>
 </html>

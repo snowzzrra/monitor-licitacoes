@@ -1,0 +1,24 @@
+# Arquivo de variáveis de ambiente
+# NUNCA envie este arquivo para o Git. Ele contém suas chaves secretas.
+.env
+
+# Banco de dados SQLite
+# É uma boa prática não versionar o banco de dados diretamente.
+*.db
+*.sqlite3
+
+# Arquivos de cache e compilados do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pastas de ambiente virtual
+venv/
+.venv/
+env/
+ENV/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
