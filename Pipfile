@@ -12,6 +12,7 @@ beautifulsoup4 = "*"
 selenium = "*"
 psycopg2-binary = "*"
 chromium-binary-lambda = "*"
+certifi = "*"
 
 [dev-packages]
 

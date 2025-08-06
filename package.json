@@ -3,6 +3,6 @@
     "node": "18.x"
   },
   "scripts": {
-    "vercel-build": "pip install pipenv && pipenv install --deploy"
+    "vercel-build": "pip install pipenv && pipenv install --system --deploy"
   }
 }
