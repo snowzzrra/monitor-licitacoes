@@ -4,8 +4,6 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-from dotenv import load_dotenv
-
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -14,9 +12,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-
-# Carrega variáveis de ambiente para desenvolvimento local
-load_dotenv()
 
 app = Flask(__name__)
 
