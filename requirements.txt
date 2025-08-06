@@ -1,0 +1,8 @@
+flask
+flask_sqlalchemy
+psycopg2-binary
+playwright
+beautifulsoup4
+requests
+python-dotenv
+gunicorn

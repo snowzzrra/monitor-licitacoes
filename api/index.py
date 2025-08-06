@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for, jso
 from flask_sqlalchemy import SQLAlchemy
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../templates')
 
 # --- CONFIGURAÇÃO DE AMBIENTE (sem alterações) ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
