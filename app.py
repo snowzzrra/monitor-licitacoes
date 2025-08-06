@@ -4,8 +4,6 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-from dotenv import load_dotenv
-
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -15,12 +13,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-load_dotenv()
-
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ROBUSTA ---
-# Procura pela variável da Vercel primeiro, depois pela do .env local.
+# --- CONFIGURAÇÃO DE AMBIENTE ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
@@ -39,7 +34,6 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
-# ... (O restante do seu app.py, incluindo modelos, funções de scraping e rotas, permanece o mesmo) ...
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
