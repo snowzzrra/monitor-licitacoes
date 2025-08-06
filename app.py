@@ -3,20 +3,13 @@ import time
 from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
-
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
-
-import chromium_binary
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ---
+# --- CONFIGURAÇÃO DE AMBIENTE (sem alterações) ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
@@ -27,19 +20,17 @@ if db_url.startswith("postgres://"):
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 280,
     'pool_pre_ping': True
 }
-
 db = SQLAlchemy(app)
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
-# ... (Modelos e funções de notificação permanecem os mesmos) ...
+# --- Modelos e Funções de Notificação (sem alterações) ---
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
@@ -68,98 +59,105 @@ def notificar_todos_usuarios(mensagem):
         for usuario in usuarios:
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
-def configurar_driver_selenium():
-    """
-    Configura o Selenium para usar o chromium-binary-lambda (Plano B).
-    """
-    options = webdriver.ChromeOptions()
-    
-    # Aponta para os executáveis fornecidos pelo pacote chromium-binary-lambda
-    options.binary_location = chromium_binary.chromium_path
-    
-    options.add_argument('--headless=new')
-    options.add_argument('--no-sandbox')
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1280x1696")
-    options.add_argument("--single-process")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-dev-tools")
-    options.add_argument("--no-zygote")
-    options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
-
-    driver = webdriver.Chrome(
-        service=webdriver.ChromeService(chromium_binary.chromedriver_path),
-        options=options
-    )
-    return driver
+# --- FUNÇÕES DE SCRAPING ATUALIZADAS COM PLAYWRIGHT ---
 
 def buscar_licitacoes_por_data(data_busca):
-    driver = None
-    try:
-        driver = configurar_driver_selenium()
-        driver.get(URL_FORMULARIO)
-        wait = WebDriverWait(driver, 30)
-        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, 'ifsys')))
-        campo_data_inicio = wait.until(EC.presence_of_element_located((By.NAME, 'txtDataAberturaInicial')))
-        campo_data_fim = driver.find_element(By.NAME, 'txtDataAberturaFinal')
-        data_formatada = data_busca.strftime('%d/%m/%Y')
-        driver.execute_script("arguments[0].value = arguments[1];", campo_data_inicio, data_formatada)
-        driver.execute_script("arguments[0].value = arguments[1];", campo_data_fim, data_formatada)
-        botao_pesquisar = wait.until(EC.element_to_be_clickable((By.ID, 'btnPesquisarAcompanhamentos')))
-        driver.execute_script("arguments[0].click();", botao_pesquisar)
-        wait.until(EC.presence_of_element_located((By.ID, 'tblListaAcompanhamento')))
-        linhas_de_resultado = driver.find_elements(By.XPATH, "//table[@id='tblListaAcompanhamento']/tbody/tr")
-        licitacoes_encontradas = []
-        for linha in linhas_de_resultado:
-            celulas = linha.find_elements(By.TAG_NAME, 'td')
-            if len(celulas) > 6:
-                licitacoes_encontradas.append({'numero_completo': celulas[0].text, 'orgao': celulas[1].text, 'status': celulas[5].text, 'objeto': celulas[6].text})
-        return licitacoes_encontradas
-    except Exception as e:
-        print(f"Erro no scraping por data: {e}")
-        return []
-    finally:
-        if driver: driver.quit()
+    """Função reescrita com Playwright para buscar licitações por data."""
+    licitacoes_encontradas = []
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch() # Não precisa de argumentos extras na Vercel
+            page = browser.new_page()
+            page.goto(URL_FORMULARIO, timeout=60000) # Timeout de 60s
+            
+            # Localiza o iframe e os campos dentro dele
+            frame = page.frame_locator("#ifsys")
+            data_formatada = data_busca.strftime('%d/%m/%Y')
+            
+            # Preenche os campos de data
+            frame.locator("input[name='txtDataAberturaInicial']").fill(data_formatada)
+            frame.locator("input[name='txtDataAberturaFinal']").fill(data_formatada)
+            
+            # Clica no botão de pesquisa
+            frame.locator("#btnPesquisarAcompanhamentos").click()
+            
+            # Aguarda a tabela de resultados aparecer
+            frame.locator("#tblListaAcompanhamento").wait_for(timeout=30000)
+            
+            linhas_de_resultado = frame.locator("//table[@id='tblListaAcompanhamento']/tbody/tr").all()
+            for linha in linhas_de_resultado:
+                celulas = linha.locator('td').all_inner_texts()
+                if len(celulas) > 6:
+                    licitacoes_encontradas.append({
+                        'numero_completo': celulas[0],
+                        'orgao': celulas[1],
+                        'status': celulas[5],
+                        'objeto': celulas[6]
+                    })
+            browser.close()
+        except PlaywrightTimeoutError:
+            print("Timeout ao buscar licitações. O site pode estar lento ou a tabela de resultados não apareceu.")
+        except Exception as e:
+            print(f"Erro no scraping por data com Playwright: {e}")
+            if 'browser' in locals() and browser.is_connected():
+                browser.close()
+    return licitacoes_encontradas
 
 def buscar_detalhes_licitacao(numero_completo):
-    driver = None
-    try:
-        driver = configurar_driver_selenium()
-        driver.get(URL_FORMULARIO)
-        wait = WebDriverWait(driver, 40)
-        wait.until(EC.frame_to_be_available_and_switch_to_it((By.ID, 'ifsys')))
-        campo_licitacao = wait.until(EC.element_to_be_clickable((By.NAME, 'txtNumeroLicitacao')))
-        campo_licitacao.clear()
-        campo_licitacao.send_keys(numero_completo)
-        botao_pesquisar = wait.until(EC.element_to_be_clickable((By.ID, 'btnPesquisarAcompanhamentos')))
-        driver.execute_script("arguments[0].click();", botao_pesquisar)
-        wait.until(EC.presence_of_element_located((By.ID, 'tblListaAcompanhamento')))
-        link_licitacao = wait.until(EC.element_to_be_clickable((By.XPATH, "//table[@id='tblListaAcompanhamento']/tbody/tr[1]/td[1]/a")))
-        driver.execute_script("arguments[0].click();", link_licitacao)
-        wait.until(EC.presence_of_element_located((By.ID, 'ConteudoPrint')))
-        soup = BeautifulSoup(driver.page_source, 'lxml')
-        dados_gerais = {}
-        tabela_detalhes = soup.find('table', id='ConteudoPrint')
-        if tabela_detalhes:
-            for linha in tabela_detalhes.find_all('tr'):
-                celulas_th = linha.find_all('th')
-                if len(celulas_th) >= 2:
-                    dados_gerais[celulas_th[0].get_text(strip=True).replace(':', '')] = celulas_th[1].get_text(strip=True)
-        eventos = []
-        titulo_eventos = soup.find('th', string='EVENTOS')
-        if titulo_eventos:
-            tabela_eventos = titulo_eventos.find_parent('table').find_next_sibling('table')
-            if tabela_eventos:
-                for linha in tabela_eventos.find_all('tr'):
-                    celulas = linha.find_all('td')
-                    if len(celulas) >= 2:
-                        eventos.append({'data_hora': celulas[0].get_text(strip=True), 'descricao': celulas[1].get_text(strip=True)})
-        return {'dados_gerais': dados_gerais, 'eventos': eventos}, None
-    except Exception as e:
-        return None, f"Erro ao buscar detalhes: {e}"
-    finally:
-        if driver: driver.quit()
+    """Função reescrita com Playwright para buscar detalhes de uma licitação."""
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(URL_FORMULARIO, timeout=60000)
+            
+            frame = page.frame_locator("#ifsys")
+            
+            # Preenche o número da licitação e pesquisa
+            frame.locator("input[name='txtNumeroLicitacao']").fill(numero_completo)
+            frame.locator("#btnPesquisarAcompanhamentos").click()
+            
+            # Clica no link do resultado
+            frame.locator("//table[@id='tblListaAcompanhamento']/tbody/tr[1]/td[1]/a").click()
+            
+            # Aguarda a página de detalhes carregar
+            frame.locator("#ConteudoPrint").wait_for(timeout=30000)
+            
+            # Extrai os dados com BeautifulSoup
+            soup = BeautifulSoup(page.content(), 'lxml')
+            frame_soup = BeautifulSoup(str(soup.find(id='ifsys')), 'lxml') # Foco no conteúdo do iframe
+            
+            dados_gerais = {}
+            tabela_detalhes = frame_soup.find('table', id='ConteudoPrint')
+            if tabela_detalhes:
+                for linha in tabela_detalhes.find_all('tr'):
+                    celulas_th = linha.find_all('th')
+                    if len(celulas_th) >= 2:
+                        chave = celulas_th[0].get_text(strip=True).replace(':', '')
+                        valor = celulas_th[1].get_text(strip=True)
+                        dados_gerais[chave] = valor
 
+            eventos = []
+            titulo_eventos = frame_soup.find('th', string='EVENTOS')
+            if titulo_eventos:
+                tabela_eventos = titulo_eventos.find_parent('table').find_next_sibling('table')
+                if tabela_eventos:
+                    for linha in tabela_eventos.find_all('tr'):
+                        celulas_td = linha.find_all('td')
+                        if len(celulas_td) >= 2:
+                            eventos.append({'data_hora': celulas_td[0].get_text(strip=True), 'descricao': celulas_td[1].get_text(strip=True)})
+
+            browser.close()
+            return {'dados_gerais': dados_gerais, 'eventos': eventos}, None
+            
+        except Exception as e:
+            if 'browser' in locals() and browser.is_connected():
+                browser.close()
+            return None, f"Erro ao buscar detalhes com Playwright: {e}"
+
+# --- Rotas do Flask (a maioria permanece a mesma) ---
+# ... As rotas @app.route('/'), @app.route('/inscrever'), etc. permanecem exatamente as mesmas ...
+# A única mudança é que elas agora chamarão as funções de scraping reescritas.
 @app.route('/')
 def index():
     try:

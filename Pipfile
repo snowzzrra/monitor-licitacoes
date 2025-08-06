@@ -9,10 +9,9 @@ flask-sqlalchemy = "*"
 python-dotenv = "*"
 requests = "*"
 beautifulsoup4 = "*"
-selenium = "*"
 psycopg2-binary = "*"
-chromium-binary-lambda = "*"
 certifi = "*"
+playwright = "*"
 
 [dev-packages]
 
