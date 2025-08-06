@@ -19,13 +19,14 @@ rm chrome.zip
 mv chrome-linux64 /opt/google/chrome
 echo "Google Chrome instalado."
 
-# 4. Baixa, instala e TORNA EXECUTÁVEL o Chromedriver
-echo "Baixando Chromedriver..."
+# 4. Baixa, instala e torna executável o Chromedriver em um caminho padrão
+echo "Baixando e instalando Chromedriver..."
 wget https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/127.0.6533.72/linux64/chromedriver-linux64.zip -q -O chromedriver.zip
 unzip -q chromedriver.zip
 rm chromedriver.zip
-mv chromedriver-linux64 /opt/chromedriver
-chmod +x /opt/chromedriver/chromedriver # <-- A CORREÇÃO CRUCIAL
-echo "Chromedriver instalado e configurado."
+# Move o executável para um diretório de sistema (PATH)
+mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+chmod +x /usr/local/bin/chromedriver
+echo "Chromedriver instalado em /usr/local/bin/chromedriver."
 
 echo "Build finalizado com sucesso!"

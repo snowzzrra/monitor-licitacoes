@@ -4,6 +4,8 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
+from dotenv import load_dotenv
+
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -12,6 +14,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+
+# Carrega variáveis de ambiente para desenvolvimento local
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -27,7 +32,6 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# --- SOLUÇÃO PARA O ERRO DE CONEXÃO SSL ---
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 280,
     'pool_pre_ping': True
@@ -69,10 +73,6 @@ def notificar_todos_usuarios(mensagem):
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
 def configurar_driver_selenium():
-    """
-    Configura as opções do Chrome para o ambiente da Vercel,
-    apontando para o chromedriver instalado manualmente.
-    """
     options = webdriver.ChromeOptions()
     options.binary_location = '/opt/google/chrome/chrome'
     options.add_argument('--headless=new')
@@ -86,12 +86,11 @@ def configurar_driver_selenium():
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
     
     # --- MUDANÇA PRINCIPAL ---
-    # Apontamos para o chromedriver que instalamos no build.sh
-    service = webdriver.ChromeService("/opt/chromedriver/chromedriver")
-    
-    driver = webdriver.Chrome(service=service, options=options)
+    # Não precisamos mais do 'service'. O Selenium encontrará o chromedriver no PATH.
+    driver = webdriver.Chrome(options=options)
     return driver
 
+# ... (O restante do código, incluindo as funções de scraping e rotas, permanece o mesmo) ...
 def buscar_licitacoes_por_data(data_busca):
     driver = None
     try:
