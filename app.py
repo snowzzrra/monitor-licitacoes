@@ -4,6 +4,8 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
+# A linha "from dotenv import load_dotenv" foi removida.
+
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -13,14 +15,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
+# A linha "load_dotenv()" foi removida.
+# os.getenv() funciona nativamente na Vercel.
+
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ---
+# --- CONFIGURAÇÃO DE AMBIENTE ROBUSTA ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
 
-# Corrige a string de conexão para o SQLAlchemy, se necessário
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
@@ -34,6 +38,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
+# ... (Modelos, funções de notificação e scraping permanecem os mesmos) ...
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
@@ -152,7 +157,7 @@ def index():
         licitacoes_hoje = Licitacao.query.filter(db.func.date(Licitacao.data_verificacao) >= hoje).order_by(Licitacao.id.desc()).all()
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
-        flash("Erro ao conectar ao banco de dados. Verifique as configurações.", "danger")
+        flash("Erro ao conectar ao banco de dados. As tabelas foram criadas? Tente acessar /init-db.", "danger")
         licitacoes_hoje = []
     return render_template('index.html', licitacoes_hoje=licitacoes_hoje)
 
@@ -215,8 +220,40 @@ def tarefa_diaria_verificacao():
     print(f"Verificação concluída. Novas: {novas_encontradas}. Atualizadas: {atualizadas}.")
     return jsonify({'status': 'success', 'novas': novas_encontradas, 'atualizadas': atualizadas}), 200
 
+# --- ROTAS DE DEBUG REINTEGRADAS ---
+@app.route('/forcar-busca')
+def forcar_busca():
+    tarefa_diaria_verificacao() # Chama a função diretamente
+    flash('A verificação diária foi forçada a executar. Verifique o log do terminal e a aba "Licitações do Dia" em instantes.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/testar-notificacoes')
+def testar_notificacoes():
+    hoje = datetime.now().date()
+    licitacoes_hoje = Licitacao.query.filter(db.func.date(Licitacao.data_verificacao) >= hoje).all()
+    if not licitacoes_hoje:
+        flash('Nenhuma licitação encontrada no banco de dados para hoje. Force uma verificação primeiro.', 'warning')
+        return redirect(url_for('index'))
+    mensagem_geral = f"📋 *Resumo das Licitações de Hoje ({hoje.strftime('%d/%m/%Y')})*\n\n"
+    for lic in licitacoes_hoje:
+        mensagem_geral += f"• `{lic.numero_completo}` ({lic.status})\n"
+    notificar_todos_usuarios(mensagem_geral)
+    flash(f'Tentativa de envio de {len(licitacoes_hoje)} licitações para os usuários inscritos.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/limpar-db')
+def limpar_db():
+    try:
+        num_rows_deleted = db.session.query(Licitacao).delete()
+        db.session.commit()
+        flash(f'{num_rows_deleted} registros de licitações foram apagados do banco de dados.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao limpar o banco de dados: {e}', 'danger')
+    return redirect(url_for('index'))
+
 @app.route('/init-db')
 def init_db():
     with app.app_context():
         db.create_all()
-    return "Banco de dados inicializado."
+    return "Banco de dados inicializado com sucesso. As tabelas 'licitacao' e 'usuario_telegram' foram criadas."
