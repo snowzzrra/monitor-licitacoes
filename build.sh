@@ -33,9 +33,4 @@ mv chromedriver-linux64/chromedriver /opt/chromedriver/chromedriver
 chmod +x /opt/chromedriver/chromedriver
 echo "Chromedriver instalado."
 
-# --- A CORREÇÃO FINAL ---
-# 6. Cria o diretório de saída 'public' que a Vercel espera.
-echo "Criando diretório de saída 'public' para a Vercel..."
-mkdir public
-
 echo "Build finalizado com sucesso!"
