@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 from datetime import datetime
 import requests
@@ -6,6 +7,40 @@ from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
+def setup_playwright():
+    # O caminho onde a Vercel armazena coisas que podem ser salvas em cache
+    install_path = "/tmp/playwright-install"
+    # Um arquivo de "trava" para sabermos que a instalação já foi feita
+    lock_file_path = f"{install_path}/installed.lock"
+
+    # Se o arquivo de trava não existe, significa que precisamos instalar
+    if not os.path.exists(lock_file_path):
+        print("Instalando Playwright e navegador Chromium pela primeira vez...")
+        os.makedirs(install_path, exist_ok=True)
+        
+        # Define o caminho do cache do Playwright para um local gravável
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = install_path
+        
+        # Comando para instalar o navegador
+        command = ["python3.12", "-m", "playwright", "install", "chromium"]
+        
+        # Executa o comando
+        result = subprocess.run(command, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print("Instalação do Playwright finalizada com sucesso.")
+            print(result.stdout)
+            # Cria o arquivo de trava para não instalar de novo
+            with open(lock_file_path, 'w') as f:
+                f.write('installed')
+        else:
+            print("ERRO na instalação do Playwright:")
+            print(result.stderr)
+    else:
+        print("Playwright já está instalado (cache).")
+        # Define a variável de ambiente mesmo se já estiver instalado
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = install_path
 
 app = Flask(__name__, template_folder='../templates')
 
