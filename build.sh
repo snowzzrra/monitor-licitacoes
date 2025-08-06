@@ -6,9 +6,9 @@ set -ex
 # Vercel já instalou as dependências do Python a partir do requirements.txt.
 # A única tarefa deste script é instalar o Google Chrome e o Chromedriver.
 
-# 1. Instala as dependências do sistema para o Chrome
+# 1. Instala as dependências do sistema para o Chrome (GConf2 foi removido)
 echo "Instalando dependências do sistema para o Chrome..."
-yum install -y alsa-lib atk at-spi2-atk cups-libs GConf2 gtk3 libX11-xcb libXcomposite libXcursor libXdamage libXext libXfixes libXi libXrandr libXScrnSaver libXtst pango liberation-sans-fonts xdg-utils
+yum install -y alsa-lib atk at-spi2-atk cups-libs gtk3 libX11-xcb libXcomposite libXcursor libXdamage libXext libXfixes libXi libXrandr libXScrnSaver libXtst pango liberation-sans-fonts xdg-utils
 
 # 2. Baixa e instala o Google Chrome
 echo "Baixando Google Chrome..."
