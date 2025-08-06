@@ -1,7 +1,8 @@
 flask
 flask_sqlalchemy
 psycopg2-binary
-playwright
+selenium
+chrome-for-testing-manager
 beautifulsoup4
 requests
 python-dotenv
