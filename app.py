@@ -4,6 +4,9 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
+# Importa a nova biblioteca para o Chrome serverless
+import chrome_aws_lambda
+
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -69,11 +72,10 @@ def notificar_todos_usuarios(mensagem):
 
 def configurar_driver_selenium():
     """
-    Configura as opções do Chrome para o ambiente da Vercel,
-    apontando para o chromedriver instalado manualmente.
+    Configura o Selenium para usar o chrome-aws-lambda,
+    a forma correta para ambientes serverless como a Vercel.
     """
     options = webdriver.ChromeOptions()
-    options.binary_location = '/opt/google/chrome/chrome'
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
     options.add_argument("--disable-gpu")
@@ -84,13 +86,16 @@ def configurar_driver_selenium():
     options.add_argument("--no-zygote")
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
     
-    # --- A CORREÇÃO FINAL ---
-    # Apontamos explicitamente para o chromedriver que instalamos no build.sh
-    service = webdriver.ChromeService("/usr/local/bin/chromedriver")
+    # Aponta para os executáveis fornecidos pelo pacote chrome-aws-lambda
+    options.binary_location = chrome_aws_lambda.chrome_executable_path
     
-    driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(
+        service=webdriver.ChromeService(chrome_aws_lambda.chromedriver_path),
+        options=options
+    )
     return driver
 
+# ... (O restante do código, incluindo as funções de scraping e rotas, permanece o mesmo) ...
 def buscar_licitacoes_por_data(data_busca):
     driver = None
     try:
