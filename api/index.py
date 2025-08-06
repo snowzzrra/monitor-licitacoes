@@ -5,15 +5,13 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import requests
 
-# NOVA ABORDAGEM COM SELENIUM
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
-import chrome_for_testing_manager as cft_manager
+from chrome_for_testing_manager import init as init_chrome
 
-# --- Configuração do Flask (sem alterações, exceto o template_folder) ---
 app = Flask(__name__, template_folder='../templates')
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
@@ -60,7 +58,7 @@ def notificar_todos_usuarios(mensagem):
 # --- FUNÇÕES DE SCRAPING REESCRITAS PARA SELENIUM ---
 
 def configurar_driver_selenium():
-    """Configura o Selenium para usar o Chrome for Testing Manager."""
+    """Configura o Selenium com o chrome-for-testing-manager CORRETAMENTE."""
     options = webdriver.ChromeOptions()
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
@@ -70,9 +68,11 @@ def configurar_driver_selenium():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-zygote")
     
-    # A MÁGICA COM O NOVO PACOTE SUGERIDO POR VOCÊ
-    driver_path = cft_manager.Manager().get_driver_path()
-    service = Service(executable_path=driver_path)
+    # DE ACORDO COM A DOCUMENTAÇÃO QUE VOCÊ ENVIOU:
+    chrome_path, chromedriver_path = init_chrome()
+    
+    options.binary_location = chrome_path
+    service = Service(executable_path=chromedriver_path)
     
     driver = webdriver.Chrome(service=service, options=options)
     return driver
