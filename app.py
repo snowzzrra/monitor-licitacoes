@@ -4,8 +4,7 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-# Importa a nova biblioteca para o Chrome serverless
-import chrome_aws_lambda
+import sparticuz
 
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -18,7 +17,7 @@ from selenium.common.exceptions import TimeoutException
 
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ROBUSTA ---
+# --- CONFIGURAÇÃO DE AMBIENTE ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
@@ -71,10 +70,6 @@ def notificar_todos_usuarios(mensagem):
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
 def configurar_driver_selenium():
-    """
-    Configura o Selenium para usar o chrome-aws-lambda,
-    a forma correta para ambientes serverless como a Vercel.
-    """
     options = webdriver.ChromeOptions()
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
@@ -86,16 +81,12 @@ def configurar_driver_selenium():
     options.add_argument("--no-zygote")
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
     
-    # Aponta para os executáveis fornecidos pelo pacote chrome-aws-lambda
-    options.binary_location = chrome_aws_lambda.chrome_executable_path
-    
     driver = webdriver.Chrome(
-        service=webdriver.ChromeService(chrome_aws_lambda.chromedriver_path),
+        service=webdriver.ChromeService(sparticuz.chrome_driver_filename),
         options=options
     )
     return driver
 
-# ... (O restante do código, incluindo as funções de scraping e rotas, permanece o mesmo) ...
 def buscar_licitacoes_por_data(data_busca):
     driver = None
     try:
