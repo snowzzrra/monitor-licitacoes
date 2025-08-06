@@ -4,11 +4,10 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-import sparticuz
-
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
+import chromium_binary
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -70,7 +69,14 @@ def notificar_todos_usuarios(mensagem):
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
 def configurar_driver_selenium():
+    """
+    Configura o Selenium para usar o chromium-binary-lambda (Plano B).
+    """
     options = webdriver.ChromeOptions()
+    
+    # Aponta para os executáveis fornecidos pelo pacote chromium-binary-lambda
+    options.binary_location = chromium_binary.chromium_path
+    
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
     options.add_argument("--disable-gpu")
@@ -80,9 +86,9 @@ def configurar_driver_selenium():
     options.add_argument("--disable-dev-tools")
     options.add_argument("--no-zygote")
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
-    
+
     driver = webdriver.Chrome(
-        service=webdriver.ChromeService(sparticuz.chrome_driver_filename),
+        service=webdriver.ChromeService(chromium_binary.chromedriver_path),
         options=options
     )
     return driver

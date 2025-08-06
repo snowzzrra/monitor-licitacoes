@@ -5,4 +5,4 @@ requests
 beautifulsoup4
 selenium
 psycopg2-binary
-selenium-sparticuz
+chromium-binary-lambda
