@@ -1,5 +1,11 @@
 {
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/verificar-licitacoes",
+      "schedule": "30 11 * * 1-5"
+    }
   ]
 }
