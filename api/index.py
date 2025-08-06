@@ -181,6 +181,33 @@ def tarefa_diaria_verificacao():
     print(f"Verificação concluída. Novas: {novas_encontradas}. Atualizadas: {atualizadas}.")
     return jsonify({'status': 'success', 'novas': novas_encontradas, 'atualizadas': atualizadas}), 200
 
+@app.route('/inscrever', methods=['POST'])
+def inscrever():
+    chat_id = request.form.get('chat_id')
+    if not chat_id or not chat_id.isdigit():
+        flash('Por favor, insira um Chat ID do Telegram válido (apenas números).', 'danger')
+        return redirect(url_for('index'))
+    
+    usuario_existente = UsuarioTelegram.query.filter_by(chat_id=chat_id).first()
+    if usuario_existente:
+        flash('Este Chat ID já está cadastrado!', 'warning')
+    else:
+        novo_usuario = UsuarioTelegram(chat_id=chat_id)
+        db.session.add(novo_usuario)
+        db.session.commit()
+        flash('Inscrição realizada com sucesso!', 'success')
+        enviar_notificacao_telegram(chat_id, "✅ Olá! Você se inscreveu com sucesso no Monitor de Licitações BA.")
+    return redirect(url_for('index'))
+
+
+@app.route('/detalhes/<path:numero_completo>')
+def detalhes(numero_completo):
+    dados, erro = buscar_detalhes_licitacao(numero_completo)
+    if erro:
+        flash(f"Não foi possível carregar os detalhes. Erro: {erro}", 'danger')
+        return redirect(url_for('index'))
+    return render_template('detalhes.html', dados=dados['dados_gerais'], eventos=dados['eventos'], numero_licitacao=numero_completo)
+
 @app.route('/forcar-busca')
 def forcar_busca():
     flash('A verificação diária é executada automaticamente às 8:30 (BRT). Para testar, acione o Cron Job manualmente no dashboard da Vercel.', 'info')
