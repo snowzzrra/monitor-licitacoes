@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+flask-sqlalchemy = "*"
+python-dotenv = "*"
+requests = "*"
+beautifulsoup4 = "*"
+selenium = "*"
+psycopg2-binary = "*"
+chromium-binary-lambda = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
