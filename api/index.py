@@ -68,15 +68,14 @@ def configurar_driver_selenium():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-zygote")
     
-    # DE ACORDO COM A DOCUMENTAÇÃO QUE VOCÊ ENVIOU:
-    chrome_path, chromedriver_path = init_chrome()
+    # A CORREÇÃO FINAL: Especificar um caminho gravável em /tmp
+    chrome_path, chromedriver_path = init_chrome(path="/tmp/chrome-for-testing")
     
     options.binary_location = chrome_path
     service = Service(executable_path=chromedriver_path)
     
     driver = webdriver.Chrome(service=service, options=options)
     return driver
-
 def buscar_licitacoes_por_data(data_busca):
     driver = None
     try:
