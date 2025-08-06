@@ -71,10 +71,9 @@ def notificar_todos_usuarios(mensagem):
 def configurar_driver_selenium():
     """
     Configura as opções do Chrome para o ambiente da Vercel,
-    deixando o Selenium Manager gerenciar o chromedriver.
+    apontando para o chromedriver instalado manualmente.
     """
     options = webdriver.ChromeOptions()
-    # O Selenium Manager precisa do binário do Chrome para saber qual driver baixar.
     options.binary_location = '/opt/google/chrome/chrome'
     options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
@@ -87,8 +86,10 @@ def configurar_driver_selenium():
     options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
     
     # --- MUDANÇA PRINCIPAL ---
-    # Não especificamos mais o 'service'. O Selenium vai encontrar o chromedriver sozinho.
-    driver = webdriver.Chrome(options=options)
+    # Apontamos para o chromedriver que instalamos no build.sh
+    service = webdriver.ChromeService("/opt/chromedriver/chromedriver")
+    
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
 
 def buscar_licitacoes_por_data(data_busca):
