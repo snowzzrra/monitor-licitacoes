@@ -4,8 +4,6 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-# A linha "from dotenv import load_dotenv" foi removida.
-
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
@@ -15,12 +13,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-# A linha "load_dotenv()" foi removida.
-# os.getenv() funciona nativamente na Vercel.
-
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DE AMBIENTE ROBUSTA ---
+# --- CONFIGURAÇÃO DE AMBIENTE ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
@@ -32,13 +27,18 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Adiciona configurações de pooling para manter a conexão com o DB ativa
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 280,  # Recicla conexões a cada 280 segundos (menos de 5 minutos)
+    'pool_pre_ping': True # Verifica se a conexão está viva antes de usá-la
+}
+
 db = SQLAlchemy(app)
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
-# ... (Modelos, funções de notificação e scraping permanecem os mesmos) ...
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
@@ -220,11 +220,9 @@ def tarefa_diaria_verificacao():
     print(f"Verificação concluída. Novas: {novas_encontradas}. Atualizadas: {atualizadas}.")
     return jsonify({'status': 'success', 'novas': novas_encontradas, 'atualizadas': atualizadas}), 200
 
-# --- ROTAS DE DEBUG REINTEGRADAS ---
 @app.route('/forcar-busca')
 def forcar_busca():
-    tarefa_diaria_verificacao() # Chama a função diretamente
-    flash('A verificação diária foi forçada a executar. Verifique o log do terminal e a aba "Licitações do Dia" em instantes.', 'info')
+    flash('A verificação diária é executada automaticamente às 8:30 (BRT). Para testar, acione o Cron Job manualmente no dashboard da Vercel.', 'info')
     return redirect(url_for('index'))
 
 @app.route('/testar-notificacoes')
@@ -234,7 +232,7 @@ def testar_notificacoes():
     if not licitacoes_hoje:
         flash('Nenhuma licitação encontrada no banco de dados para hoje. Force uma verificação primeiro.', 'warning')
         return redirect(url_for('index'))
-    mensagem_geral = f"📋 *Resumo das Licitações de Hoje ({hoje.strftime('%d/%m/%Y')})*\n\n"
+    mensagem_geral = f"📋 *(TESTE)* Resumo das Licitações de Hoje ({hoje.strftime('%d/%m/%Y')})\n\n"
     for lic in licitacoes_hoje:
         mensagem_geral += f"• `{lic.numero_completo}` ({lic.status})\n"
     notificar_todos_usuarios(mensagem_geral)
