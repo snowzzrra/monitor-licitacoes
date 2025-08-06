@@ -11,7 +11,6 @@ yum install -y wget unzip
 echo "Instalando dependências do sistema para o Chrome..."
 yum install -y alsa-lib atk at-spi2-atk cups-libs gtk3 libX11-xcb libXcomposite libXcursor libXdamage libXext libXfixes libXi libXrandr libXScrnSaver libXtst pango liberation-sans-fonts xdg-utils
 
-# --- A CORREÇÃO FINAL ---
 # 3. Cria os diretórios de destino antes de mover os arquivos
 echo "Criando diretórios de destino..."
 mkdir -p /opt/google
@@ -33,5 +32,10 @@ rm chromedriver.zip
 mv chromedriver-linux64/chromedriver /opt/chromedriver/chromedriver
 chmod +x /opt/chromedriver/chromedriver
 echo "Chromedriver instalado."
+
+# --- A CORREÇÃO FINAL ---
+# 6. Cria o diretório de saída 'public' que a Vercel espera.
+echo "Criando diretório de saída 'public' para a Vercel..."
+mkdir public
 
 echo "Build finalizado com sucesso!"
