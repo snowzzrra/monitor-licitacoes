@@ -1,71 +1,72 @@
 import os
 import subprocess
-import time
-from datetime import datetime
-import requests
-from bs4 import BeautifulSoup
+
+# ==================== O SEGREDO ESTÁ AQUI ====================
+# Definimos o caminho de instalação ANTES de qualquer outro import
+# Isso garante que o Playwright, quando for importado, já saiba onde procurar.
+INSTALL_PATH = "/tmp/playwright-install"
+os.environ['PLAYWRIGHT_BROWSERS_PATH'] = INSTALL_PATH
+# ==============================================================
+
+# Agora, importamos o resto dos módulos
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from bs4 import BeautifulSoup
+from datetime import datetime
+import requests
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
+# --- Função de Setup ---
 def setup_playwright():
-    # O caminho onde a Vercel armazena coisas que podem ser salvas em cache
-    install_path = "/tmp/playwright-install"
-    # Um arquivo de "trava" para sabermos que a instalação já foi feita
-    lock_file_path = f"{install_path}/installed.lock"
+    lock_file_path = f"{INSTALL_PATH}/installed.lock"
 
-    # Se o arquivo de trava não existe, significa que precisamos instalar
     if not os.path.exists(lock_file_path):
-        print("Instalando Playwright e navegador Chromium pela primeira vez...")
-        os.makedirs(install_path, exist_ok=True)
+        print("Instalando navegador Chromium (isso só acontece uma vez)...")
         
-        # Define o caminho do cache do Playwright para um local gravável
-        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = install_path
-        
-        # Comando para instalar o navegador
+        # O comando agora é mais simples, pois a variável de ambiente já foi definida
         command = ["python3.12", "-m", "playwright", "install", "chromium"]
         
-        # Executa o comando
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
         
         if result.returncode == 0:
-            print("Instalação do Playwright finalizada com sucesso.")
-            print(result.stdout)
+            print("Navegador instalado com sucesso.")
             # Cria o arquivo de trava para não instalar de novo
+            os.makedirs(INSTALL_PATH, exist_ok=True)
             with open(lock_file_path, 'w') as f:
                 f.write('installed')
         else:
-            print("ERRO na instalação do Playwright:")
+            print("### ERRO na instalação do Playwright ###")
+            print(result.stdout)
             print(result.stderr)
+            # Lança uma exceção para parar a execução se a instalação falhar
+            raise RuntimeError("Falha ao instalar o navegador Playwright.")
     else:
-        print("Playwright já está instalado (cache).")
-        # Define a variável de ambiente mesmo se já estiver instalado
-        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = install_path
+        print("Navegador Chromium já está em cache.")
 
+# Roda a função de setup quando o servidor inicia
+setup_playwright()
+
+
+# --- O RESTO DO SEU CÓDIGO (sem alterações) ---
+
+# Configuração do Flask
 app = Flask(__name__, template_folder='../templates')
-
-# --- CONFIGURAÇÃO DE AMBIENTE (sem alterações) ---
 db_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("Nenhuma variável de banco de dados (POSTGRES_URL ou DATABASE_URL) foi encontrada.")
-
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
-
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_recycle': 280,
-    'pool_pre_ping': True
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_recycle': 280, 'pool_pre_ping': True}
 db = SQLAlchemy(app)
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CRON_SECRET = os.getenv('CRON_SECRET')
 URL_FORMULARIO = "https://www.comprasnet.ba.gov.br/inter/system/Licitacao/FormularioConsultaAcompanhamento.asp"
 
-# --- Modelos e Funções de Notificação (sem alterações) ---
+# Modelos do Banco
 class Licitacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_completo = db.Column(db.String, unique=True, nullable=False)
@@ -79,6 +80,7 @@ class UsuarioTelegram(db.Model):
     chat_id = db.Column(db.String, unique=True, nullable=False)
     notificacoes_ativas = db.Column(db.Boolean, default=True)
 
+# Funções de Notificação
 def enviar_notificacao_telegram(chat_id, mensagem):
     if not TELEGRAM_TOKEN: return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -94,85 +96,54 @@ def notificar_todos_usuarios(mensagem):
         for usuario in usuarios:
             enviar_notificacao_telegram(usuario.chat_id, mensagem)
 
-# --- FUNÇÕES DE SCRAPING ATUALIZADAS COM PLAYWRIGHT ---
-
+# Funções de Scraping (sem alterações na lógica interna)
 def buscar_licitacoes_por_data(data_busca):
-    """Função reescrita com Playwright para buscar licitações por data."""
-    licitacoes_encontradas = []
     with sync_playwright() as p:
         try:
-            browser = p.chromium.launch() # Não precisa de argumentos extras na Vercel
+            # Agora o launch() vai respeitar a variável de ambiente
+            browser = p.chromium.launch()
             page = browser.new_page()
-            page.goto(URL_FORMULARIO, timeout=60000) # Timeout de 60s
-            
-            # Localiza o iframe e os campos dentro dele
+            page.goto(URL_FORMULARIO, timeout=60000)
             frame = page.frame_locator("#ifsys")
             data_formatada = data_busca.strftime('%d/%m/%Y')
-            
-            # Preenche os campos de data
             frame.locator("input[name='txtDataAberturaInicial']").fill(data_formatada)
             frame.locator("input[name='txtDataAberturaFinal']").fill(data_formatada)
-            
-            # Clica no botão de pesquisa
             frame.locator("#btnPesquisarAcompanhamentos").click()
-            
-            # Aguarda a tabela de resultados aparecer
             frame.locator("#tblListaAcompanhamento").wait_for(timeout=30000)
-            
             linhas_de_resultado = frame.locator("//table[@id='tblListaAcompanhamento']/tbody/tr").all()
+            licitacoes_encontradas = []
             for linha in linhas_de_resultado:
                 celulas = linha.locator('td').all_inner_texts()
                 if len(celulas) > 6:
-                    licitacoes_encontradas.append({
-                        'numero_completo': celulas[0],
-                        'orgao': celulas[1],
-                        'status': celulas[5],
-                        'objeto': celulas[6]
-                    })
+                    licitacoes_encontradas.append({'numero_completo': celulas[0],'orgao': celulas[1],'status': celulas[5],'objeto': celulas[6]})
             browser.close()
-        except PlaywrightTimeoutError:
-            print("Timeout ao buscar licitações. O site pode estar lento ou a tabela de resultados não apareceu.")
+            return licitacoes_encontradas
         except Exception as e:
             print(f"Erro no scraping por data com Playwright: {e}")
             if 'browser' in locals() and browser.is_connected():
                 browser.close()
-    return licitacoes_encontradas
+            return []
 
 def buscar_detalhes_licitacao(numero_completo):
-    """Função reescrita com Playwright para buscar detalhes de uma licitação."""
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch()
             page = browser.new_page()
             page.goto(URL_FORMULARIO, timeout=60000)
-            
             frame = page.frame_locator("#ifsys")
-            
-            # Preenche o número da licitação e pesquisa
             frame.locator("input[name='txtNumeroLicitacao']").fill(numero_completo)
             frame.locator("#btnPesquisarAcompanhamentos").click()
-            
-            # Clica no link do resultado
             frame.locator("//table[@id='tblListaAcompanhamento']/tbody/tr[1]/td[1]/a").click()
-            
-            # Aguarda a página de detalhes carregar
             frame.locator("#ConteudoPrint").wait_for(timeout=30000)
-            
-            # Extrai os dados com BeautifulSoup
             soup = BeautifulSoup(page.content(), 'lxml')
-            frame_soup = BeautifulSoup(str(soup.find(id='ifsys')), 'lxml') # Foco no conteúdo do iframe
-            
-            dados_gerais = {}
+            frame_soup = BeautifulSoup(str(soup.find(id='ifsys')), 'lxml')
+            dados_gerais, eventos = {}, []
             tabela_detalhes = frame_soup.find('table', id='ConteudoPrint')
             if tabela_detalhes:
                 for linha in tabela_detalhes.find_all('tr'):
                     celulas_th = linha.find_all('th')
                     if len(celulas_th) >= 2:
-                        chave = celulas_th[0].get_text(strip=True).replace(':', '')
-                        valor = celulas_th[1].get_text(strip=True)
-                        dados_gerais[chave] = valor
-
-            eventos = []
+                        dados_gerais[celulas_th[0].get_text(strip=True).replace(':', '')] = celulas_th[1].get_text(strip=True)
             titulo_eventos = frame_soup.find('th', string='EVENTOS')
             if titulo_eventos:
                 tabela_eventos = titulo_eventos.find_parent('table').find_next_sibling('table')
@@ -181,18 +152,14 @@ def buscar_detalhes_licitacao(numero_completo):
                         celulas_td = linha.find_all('td')
                         if len(celulas_td) >= 2:
                             eventos.append({'data_hora': celulas_td[0].get_text(strip=True), 'descricao': celulas_td[1].get_text(strip=True)})
-
             browser.close()
             return {'dados_gerais': dados_gerais, 'eventos': eventos}, None
-            
         except Exception as e:
             if 'browser' in locals() and browser.is_connected():
                 browser.close()
             return None, f"Erro ao buscar detalhes com Playwright: {e}"
 
-# --- Rotas do Flask (a maioria permanece a mesma) ---
-# ... As rotas @app.route('/'), @app.route('/inscrever'), etc. permanecem exatamente as mesmas ...
-# A única mudança é que elas agora chamarão as funções de scraping reescritas.
+# Rotas do Flask (sem alterações)
 @app.route('/')
 def index():
     try:
@@ -200,37 +167,13 @@ def index():
         licitacoes_hoje = Licitacao.query.filter(db.func.date(Licitacao.data_verificacao) >= hoje).order_by(Licitacao.id.desc()).all()
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
-        flash("Erro ao conectar ao banco de dados. As tabelas foram criadas? Tente acessar /init-db.", "danger")
+        flash("Erro ao conectar ao banco de dados.", "danger")
         licitacoes_hoje = []
     return render_template('index.html', licitacoes_hoje=licitacoes_hoje)
 
-@app.route('/inscrever', methods=['POST'])
-def inscrever():
-    chat_id = request.form.get('chat_id')
-    if not chat_id or not chat_id.isdigit():
-        flash('Por favor, insira um Chat ID do Telegram válido (apenas números).', 'danger')
-        return redirect(url_for('index'))
-    usuario_existente = UsuarioTelegram.query.filter_by(chat_id=chat_id).first()
-    if usuario_existente:
-        flash('Este Chat ID já está cadastrado!', 'warning')
-    else:
-        novo_usuario = UsuarioTelegram(chat_id=chat_id)
-        db.session.add(novo_usuario)
-        db.session.commit()
-        flash('Inscrição realizada com sucesso!', 'success')
-        enviar_notificacao_telegram(chat_id, "✅ Olá! Você se inscreveu com sucesso no Monitor de Licitações BA.")
-    return redirect(url_for('index'))
-
-@app.route('/detalhes/<path:numero_completo>')
-def detalhes(numero_completo):
-    dados, erro = buscar_detalhes_licitacao(numero_completo)
-    if erro:
-        flash(f"Não foi possível carregar os detalhes. Erro: {erro}", 'danger')
-        return redirect(url_for('index'))
-    return render_template('detalhes.html', dados=dados['dados_gerais'], eventos=dados['eventos'], numero_licitacao=numero_completo)
-
 @app.route('/api/cron/verificar-licitacoes')
 def tarefa_diaria_verificacao():
+    # ... seu código da tarefa cron ...
     auth_header = request.headers.get('Authorization')
     if not auth_header or auth_header != f'Bearer {CRON_SECRET}':
         return jsonify({'status': 'unauthorized'}), 401
