@@ -1,8 +1,5 @@
 {
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
-    "vercel-build": "pip install pipenv && pipenv install --system --deploy && playwright install --with-deps chromium"
+    "vercel-build": "./build.sh"
   }
 }
